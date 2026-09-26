@@ -22,7 +22,7 @@ st.set_page_config(page_title="Finances de l'État", page_icon=":material/accoun
 
 # Liens du projet. Un lien vide masque le bouton correspondant.
 URL_DEPOT = "https://github.com/Wuzardor/finances-etat"
-URL_SOUTIEN = ""  # page de soutien : Patreon, Ko-fi, Liberapay…
+URL_SOUTIEN = "https://ko-fi.com/finance_etat"  # page de soutien : Patreon, Ko-fi, Liberapay…
 
 # ---------------------------------------------------------------------------
 # Couleurs : palette catégorielle de référence, dans son ordre validé
