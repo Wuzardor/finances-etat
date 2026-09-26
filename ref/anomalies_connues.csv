@@ -1,0 +1,18 @@
+jeu,code,periode,explication
+execution,depenses_titres,2019,"Fichier des textes législatifs : le total des dépenses exécutées 2019-2021 est décalé d'un an (2019 reprend 2018, 2020 reprend 2019, 2021 reprend 2020). Les SMB de décembre sont cohérentes et servent de référence."
+execution,depenses_titres,2020,"Fichier des textes législatifs : le total des dépenses exécutées 2019-2021 est décalé d'un an (2019 reprend 2018, 2020 reprend 2019, 2021 reprend 2020). Les SMB de décembre sont cohérentes et servent de référence."
+execution,depenses_titres,2021,"Fichier des textes législatifs : le total des dépenses exécutées 2019-2021 est décalé d'un an (2019 reprend 2018, 2020 reprend 2019, 2021 reprend 2020). Les SMB de décembre sont cohérentes et servent de référence."
+execution,solde,2019,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+execution,solde,2020,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+execution,solde,2021,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+execution_vs_smb,execution_vs_smb,2019,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+execution_vs_smb,execution_vs_smb,2020,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+execution_vs_smb,execution_vs_smb,2021,Conséquence du décalage du total des dépenses exécutées 2019-2021 dans le fichier des textes législatifs.
+lfi,psr,2022,"Fichier des textes législatifs : en LFI 2022, « PSR collectivités » contient les dépenses d'opérations financières (4,15 Md€) et « PSR Union européenne » le total des PSR (69,6 Md€)."
+lfi,solde,2013,"L'écart est exactement égal au solde prévu des budgets annexes : le solde LFI de 2013 à 2015 semble les exclure."
+lfi,solde,2014,"L'écart est exactement égal au solde prévu des budgets annexes : le solde LFI de 2013 à 2015 semble les exclure."
+lfi,solde,2015,"L'écart est exactement égal au solde prévu des budgets annexes : le solde LFI de 2013 à 2015 semble les exclure."
+lfr,solde,2013,"Écart de quelques M€ (moins de 0,02 % du solde) lié au traitement des budgets annexes avant 2017 : en 2013-2014 il est exactement égal à leur solde prévu, et leur solde d'exécution est nul dans la source jusqu'en 2016."
+lfr,solde,2014,"Écart de quelques M€ (moins de 0,02 % du solde) lié au traitement des budgets annexes avant 2017 : en 2013-2014 il est exactement égal à leur solde prévu, et leur solde d'exécution est nul dans la source jusqu'en 2016."
+lfr,solde,2015,"Écart de quelques M€ (moins de 0,02 % du solde) lié au traitement des budgets annexes avant 2017 : en 2013-2014 il est exactement égal à leur solde prévu, et leur solde d'exécution est nul dans la source jusqu'en 2016."
+lfr,solde,2016,"Écart de quelques M€ (moins de 0,02 % du solde) lié au traitement des budgets annexes avant 2017 : en 2013-2014 il est exactement égal à leur solde prévu, et leur solde d'exécution est nul dans la source jusqu'en 2016."

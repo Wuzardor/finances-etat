@@ -1,0 +1,36 @@
+# Collecte quotidienne des sources. Les nouveaux fichiers bruts sont publiés dans le dépôt :
+# le site hébergé les récupère et reconstruit sa base à la visite suivante.
+name: Mise à jour des données
+
+on:
+  schedule:
+    - cron: "17 5 * * *"  # tous les jours à 5 h 17 UTC
+  workflow_dispatch:       # bouton « Run workflow » dans l'onglet Actions
+
+permissions:
+  contents: write
+
+jobs:
+  collecte:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Collecte, construction de la base et contrôles
+        run: uv run python -m finances_etat
+
+      - name: Publication des nouveaux fichiers
+        run: |
+          # Le journal change à chaque passage : on ne publie que s'il y a un nouveau fichier brut
+          nouveaux=$(git status --porcelain --untracked-files=all -- data/raw | grep -v journal.csv || true)
+          if [ -n "$nouveaux" ]; then
+            echo "$nouveaux"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/raw
+            git commit -m "Données : nouvelle version des sources ($(date +%d/%m/%Y))"
+            git push
+          else
+            echo "Aucune nouvelle donnée."
+          fi

@@ -1,0 +1,11 @@
+cofog99,fonction,precision,ordre
+GF10,Protection sociale,"retraites, famille, chômage, pauvreté, handicap",1
+GF07,Santé,"hôpitaux, soins de ville, médicaments",2
+GF01,Services généraux,"intérêts de la dette, transferts entre administrations, administration générale",3
+GF04,Affaires économiques,"transports, énergie, agriculture, aides aux entreprises",4
+GF09,Enseignement,"de la maternelle au supérieur",5
+GF02,Défense,armées,6
+GF03,Ordre et sécurité,"police, gendarmerie, justice, pompiers",7
+GF06,Logement et équipements,"logement, urbanisme, eau, éclairage public",8
+GF08,"Culture, sport, loisirs","culture, sport, médias, cultes",9
+GF05,Environnement,"déchets, eaux usées, pollution, biodiversité",10

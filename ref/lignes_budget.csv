@@ -1,0 +1,27 @@
+code,libelle_source,libelle_court,famille,parent,ordre
+solde_budgetaire,Solde budgétaire,Solde budgétaire,solde,,1
+rec_bg_nettes,Total recettes nettes du budget général,Recettes nettes du budget général,recette,,10
+rec_fiscales,Total recettes fiscales,Recettes fiscales nettes,recette,rec_bg_nettes,11
+rec_ir,Impôt sur le revenu,Impôt sur le revenu,recette,rec_fiscales,12
+rec_is,Impôt sur les sociétés,Impôt sur les sociétés,recette,rec_fiscales,13
+rec_tva,Taxe sur la valeur ajoutée,TVA,recette,rec_fiscales,14
+rec_ticpe,Taxe intérieure de consommation sur les produits énergétiques,TICPE,recette,rec_fiscales,15
+rec_autres_fiscales,Autres recettes fiscales,Autres recettes fiscales,recette,rec_fiscales,16
+rec_non_fiscales,Total recettes non fiscales,Recettes non fiscales,recette,rec_bg_nettes,17
+rec_fonds_concours,Fonds de concours et attribution de produits,Fonds de concours,recette,,18
+dep_bg_total,Total dépenses nettes du budget général,Dépenses nettes du budget général,depense,,20
+dep_t1_pouvoirs_publics,Dotation des pouvoirs publics,Pouvoirs publics (T1),depense,dep_bg_total,21
+dep_t2_personnel,Dépenses de personnel,Personnel (T2),depense,dep_bg_total,22
+dep_t3_fonctionnement,Dépenses de fonctionnement,Fonctionnement (T3),depense,dep_bg_total,23
+dep_t4_charge_dette,Charges de la dette de l'Etat,Charge de la dette (T4),depense,dep_bg_total,24
+dep_t5_investissement,Dépenses d'investissement,Investissement (T5),depense,dep_bg_total,25
+dep_t6_intervention,Dépenses d'intervention,Intervention (T6),depense,dep_bg_total,26
+dep_t7_operations_financieres,Dépenses d'opérations financières,Opérations financières (T7),depense,dep_bg_total,27
+psr_total,Total prélèvements sur recettes,Prélèvements sur recettes,depense,,30
+psr_collectivites,PSR au profit des collectivités territoriales,PSR collectivités,depense,psr_total,31
+psr_ue,PSR au profit de l'Union européenne,PSR Union européenne,depense,psr_total,32
+rd_impots_etat,Remboursements et dégrèvements d'impôts d'Etat,R&D impôts d'État,depense,,40
+rd_impots_locaux,Remboursements et dégrèvements d'impôts locaux,R&D impôts locaux,depense,,41
+solde_comptes_speciaux,Solde des comptes spéciaux,Solde des comptes spéciaux,solde,,50
+solde_ccf_avances_ct,CCF Avances aux collectivités territoriales,dont avances aux collectivités,solde,solde_comptes_speciaux,51
+solde_budgets_annexes,Solde des Budgets annexes,Solde des budgets annexes,solde,,52

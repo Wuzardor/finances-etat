@@ -1,0 +1,8 @@
+# Données : les fichiers bruts sont versionnés (archive des sources, reconstruction de la base
+# sur l'hébergeur) ; la base, reconstruite à partir d'eux, ne l'est pas.
+data/*
+!data/raw/
+.venv/
+__pycache__/
+.pytest_cache/
+.claude/
