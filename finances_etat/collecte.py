@@ -1,17 +1,19 @@
 """Téléchargement des fichiers bruts.
 
 Chaque fichier est conservé tel quel dans data/raw/<source>/<date>.<ext>.
-Un nouveau fichier n'est écrit que si son contenu a changé (empreinte SHA-256) :
-on garde ainsi l'historique des versions publiées, sans doublons.
+Un nouveau fichier n'est écrit que si son contenu a changé : on garde ainsi
+l'historique des versions publiées, sans doublons.
 """
 
 import csv
 import hashlib
 import re
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import duckdb
 import requests
 
 from .config import RAW_DIR
@@ -62,23 +64,54 @@ def dernier_fichier(cle: str) -> Path | None:
     return fichiers[-1] if fichiers else None
 
 
+def empreinte_parquet(chemin: Path) -> tuple:
+    """Schéma, nombre de lignes et somme des empreintes des lignes : ne dépend ni de l'ordre
+    des lignes ni de la façon dont le fichier est découpé ou compressé."""
+    source = "read_parquet('{}')".format(str(chemin).replace("'", "''"))
+    con = duckdb.connect()
+    try:
+        schema = tuple(con.sql(f"DESCRIBE SELECT * FROM {source}").fetchall())
+        return schema, con.sql(f"SELECT count(*), sum(hash(t)::HUGEINT) FROM {source} t").fetchone()
+    finally:
+        con.close()
+
+
+def meme_contenu(precedent: Path, contenu: bytes, extension: str) -> bool:
+    """Vrai si le fichier téléchargé n'apporte rien de nouveau par rapport au précédent.
+
+    Les exports Parquet de data.economie.gouv.fr ne sont pas reproductibles octet pour octet :
+    les mêmes données peuvent revenir dans un autre ordre ou autrement compressées. Pour ce
+    format, on compare donc les données elles-mêmes.
+    """
+    if precedent.read_bytes() == contenu:
+        return True
+    if extension != "parquet":
+        return False
+    with tempfile.TemporaryDirectory() as dossier:
+        telecharge = Path(dossier) / "telecharge.parquet"
+        telecharge.write_bytes(contenu)
+        return empreinte_parquet(telecharge) == empreinte_parquet(precedent)
+
+
 def telecharger(src: Source, http: requests.Session) -> Telechargement:
     url = resoudre_url(src, http)
     rep = http.get(url, timeout=TIMEOUT)
     rep.raise_for_status()
     contenu = rep.content
-    sha = hashlib.sha256(contenu).hexdigest()
     maintenant = datetime.now()
 
     precedent = dernier_fichier(src.cle)
-    if precedent and hashlib.sha256(precedent.read_bytes()).hexdigest() == sha:
-        return Telechargement(src.cle, url, precedent, sha, len(contenu), False, maintenant)
+    if precedent and meme_contenu(precedent, contenu, src.extension):
+        # Le journal décrit le fichier conservé, qui peut différer octet pour octet du téléchargement
+        conserve = precedent.read_bytes()
+        return Telechargement(src.cle, url, precedent, hashlib.sha256(conserve).hexdigest(), len(conserve),
+                              False, maintenant)
 
     dossier = RAW_DIR / src.cle
     dossier.mkdir(parents=True, exist_ok=True)
     fichier = dossier / f"{maintenant:%Y%m%d-%H%M%S}.{src.extension}"
     fichier.write_bytes(contenu)
-    return Telechargement(src.cle, url, fichier, sha, len(contenu), True, maintenant)
+    return Telechargement(src.cle, url, fichier, hashlib.sha256(contenu).hexdigest(), len(contenu), True, maintenant)
 
 
 def journaliser(t: Telechargement) -> None:

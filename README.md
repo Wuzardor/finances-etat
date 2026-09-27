@@ -1,6 +1,6 @@
 # Finances de l'État
 
-Site: https://finances-etat.streamlit.app/
+Site : https://finances-etat-fr.streamlit.app
 
 Suivi des recettes et des dépenses de l'État français à partir de l'open data :
 collecte automatique, base de données analytique, contrôles de cohérence et tableau de bord.
@@ -73,6 +73,7 @@ finances_etat/
   construction.py  construction de la base DuckDB (fichier temporaire puis remplacement atomique)
   controles.py     contrôles de cohérence
   pipeline.py      point d'entrée : python -m finances_etat
+  promo/           posts X : modèles de textes, graphiques, choix du jour, publication
 sql/vues.sql       vues analytiques (v_*) utilisées par le tableau de bord
 ref/               référentiels : lignes budgétaires, fonctions, administrations, anomalies connues
 app/               tableau de bord Streamlit
@@ -117,6 +118,12 @@ sont publiés dans le dépôt. On peut aussi la lancer à la main depuis l'ongle
 Le tableau de bord est hébergé sur Streamlit Community Cloud, qui suit la branche `main` : à chaque
 publication, l'application récupère les nouveaux fichiers et reconstruit sa base à la visite suivante.
 La base elle-même n'est pas versionnée.
+
+## Posts X
+
+Après chaque collecte, une tâche prépare les posts du compte X (textes et graphiques tirés de la base)
+et les soumet en tickets GitHub : rien n'est publié sans l'étiquette `valide`. Fonctionnement, validation
+et clés de l'API : [promo/LISEZMOI.md](promo/LISEZMOI.md).
 
 ## Lecture des chiffres
 

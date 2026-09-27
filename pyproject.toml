@@ -16,7 +16,8 @@ dependencies = [
 finances-etat = "finances_etat.pipeline:main"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", { include-group = "promo" }]
+promo = ["matplotlib>=3.9", "requests-oauthlib>=2.0"]
 
 [build-system]
 requires = ["hatchling"]

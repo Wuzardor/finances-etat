@@ -1,0 +1,55 @@
+# Après chaque collecte, prépare les posts X du jour et les soumet en tickets à valider.
+# Voir promo/LISEZMOI.md.
+name: Posts X à valider
+
+on:
+  workflow_run:
+    workflows: ["Mise à jour des données"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency: posts-x
+
+jobs:
+  proposer:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main  # la collecte vient peut-être de publier de nouvelles données
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Construction de la base
+        run: uv run python -m finances_etat --hors-ligne
+
+      - name: Choix des posts du jour
+        run: |
+          en_attente=$(gh issue list --label post-x --state open --json number --jq length)
+          uv run --group promo python -m finances_etat.promo.proposer --sortie data/propositions --en-attente "$en_attente"
+
+      - name: Publication des visuels et création des tickets
+        run: |
+          shopt -s nullglob
+          propositions=(data/propositions/*.md)
+          if [ ${#propositions[@]} -eq 0 ]; then
+            exit 0
+          fi
+          # Les visuels doivent être en ligne avant les tickets qui les affichent
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add promo
+          git commit -m "Posts X : nouvelles propositions ($(date +%d/%m/%Y))"
+          git push
+          gh label create post-x --color 1D9BF0 --description "Post X généré, à valider" --force
+          gh label create valide --color 1BAF7A --description "Post validé : publié au prochain créneau" --force
+          gh label create publie --color 898781 --description "Post publié sur X" --force
+          gh label create erreur --color E34948 --description "Erreur signalée sur le site" --force
+          for fichier in "${propositions[@]}"; do
+            tail -n +3 "$fichier" | gh issue create --title "$(head -n 1 "$fichier")" --body-file - --label post-x
+          done

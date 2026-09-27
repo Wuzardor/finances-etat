@@ -1,0 +1,56 @@
+# Publie sur X le plus ancien post validé (ticket avec les étiquettes post-x et valide).
+# Un post par créneau, du lundi au vendredi. Voir promo/LISEZMOI.md.
+name: Publication sur X
+
+on:
+  schedule:
+    - cron: "30 6 * * 1-5"   # 8 h 30 à Paris l'été, 7 h 30 l'hiver
+    - cron: "30 16 * * 1-5"  # 18 h 30 à Paris l'été, 17 h 30 l'hiver
+  workflow_dispatch:         # « Run workflow » : publier tout de suite
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency: publication-x
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Publication du plus ancien post validé
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          PROPRIETAIRE: ${{ github.repository_owner }}
+        run: |
+          # Seuls les tickets écrits par la tâche automatique ou par le propriétaire du dépôt sont publiés :
+          # l'auteur d'un ticket peut le modifier, même après sa validation.
+          numero=$(gh issue list --label post-x --label valide --state open --json number,author --jq \
+            "[.[] | select(.author.login == \"$PROPRIETAIRE\" or (.author.login | test(\"^(app/)?github-actions\")))] | sort_by(.number) | .[0].number // empty")
+          if [ -z "$numero" ]; then
+            echo "Aucun post validé en attente."
+            exit 0
+          fi
+          gh issue view "$numero" --json body --jq .body > corps.md
+          if lien=$(uv run --group promo python -m finances_etat.promo.publier corps.md 2> erreur.txt); then
+            gh issue comment "$numero" --body "Publié sur X : $lien"
+            gh issue edit "$numero" --remove-label valide --add-label publie
+            gh issue close "$numero"
+          else
+            cat erreur.txt
+            gh issue comment "$numero" --body "La publication a échoué, le post n'est plus validé. Corrige-le puis remets l'étiquette \`valide\`.
+
+          \`\`\`
+          $(tail -n 20 erreur.txt)
+          \`\`\`"
+            gh issue edit "$numero" --remove-label valide
+            exit 1
+          fi
