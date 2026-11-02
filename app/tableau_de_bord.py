@@ -431,7 +431,7 @@ with onglet["Circuits de l'argent"]:
         SELECT prelevement, sum(montant) AS t FROM v_prelevements WHERE annee = ? GROUP BY 1 ORDER BY t DESC
     """, annee_po)
     options_po = [TOUS, *totaux_po["prelevement"]]
-    choix_po = f1.selectbox("Prélèvement", options_po, index=options_po.index("TVA"), key="choix_po")
+    choix_po = f1.selectbox("Prélèvement", options_po, key="choix_po")
     prorata = f3.toggle("Montrer comment chaque administration dépense", value=True)
 
     po = requete("""
