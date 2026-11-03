@@ -12,6 +12,7 @@ import pandas as pd
 from .config import REF_DIR
 
 TOLERANCE_EUROS = 1e6  # écarts d'arrondi admis sur les agrégats publiés
+TOLERANCE_AIDES = 0.05e9  # le rapport sur les aides aux entreprises publie ses totaux à 0,1 Md€ près
 
 TITRES = ["dep_t1_pouvoirs_publics", "dep_t2_personnel", "dep_t3_fonctionnement", "dep_t4_charge_dette",
           "dep_t5_investissement", "dep_t6_intervention", "dep_t7_operations_financieres"]
@@ -116,6 +117,27 @@ def executer_controles(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
                   "controle": "Somme des fonctions = total des dépenses de l'administration",
                   "periode": str(annee), "ecart": ecart, "unite": "€", "tolerance": 0.5e9,
                   "detail": administration})
+
+    for annee, instrument, perimetre, ecart in con.sql("""
+        WITH lignes AS (
+            SELECT annee, instrument, perimetre, sum(montant) AS montant FROM v_aides_entreprises GROUP BY ALL
+        ),
+        sommes AS (
+            SELECT annee, instrument, CASE perimetre WHEN 'socle' THEN 'socle' ELSE 'complement' END AS perimetre, montant
+            FROM lignes
+            UNION ALL
+            SELECT annee, 'ensemble', 'socle', sum(montant) FROM lignes WHERE perimetre = 'socle' GROUP BY annee
+            UNION ALL
+            SELECT annee, 'ensemble', 'elargi', sum(montant) FROM lignes GROUP BY annee
+        )
+        SELECT t.annee, t.instrument, t.perimetre, s.montant - t.montant_md * 1e9
+        FROM ref_aides_totaux t
+        JOIN sommes s USING (annee, instrument, perimetre)
+    """).fetchall():
+        r.append({"jeu": "aides", "code": f"total_{instrument}_{perimetre}",
+                  "controle": "Aides aux entreprises : somme des dispositifs de l'annexe = total publié",
+                  "periode": str(annee), "ecart": ecart, "unite": "€", "tolerance": TOLERANCE_AIDES,
+                  "detail": f"{instrument}, {perimetre}"})
 
     r += _mois_manquants(con)
 

@@ -9,7 +9,7 @@ collecte automatique, base de données analytique, contrôles de cohérence et t
  Sources open data            data/raw/              DuckDB                     Streamlit
  ─────────────────            ─────────              ──────                     ─────────
  DGFiP (data.economie)  ──►   fichiers bruts   ──►   tables stg_*          ──►  tableau de bord
- Eurostat (API)               historisés,            vues v_* (analyses)        8 onglets
+ Eurostat (API)               historisés,            vues v_* (analyses)        9 onglets
                               journal.csv            meta_controles (qualité)
 ```
 
@@ -46,6 +46,7 @@ uv run --group dev pytest                     # tests
 | [gov_10dd_edpt1](https://ec.europa.eu/eurostat/databrowser/view/gov_10dd_edpt1/default/table) | Déficit et dette publics au sens de Maastricht | Eurostat |
 | [gov_10a_taxag](https://ec.europa.eu/eurostat/databrowser/view/gov_10a_taxag/default/table) | Impôts et cotisations par administration bénéficiaire (État, Sécurité sociale, collectivités, UE) | Eurostat |
 | [gov_10a_exp](https://ec.europa.eu/eurostat/databrowser/view/gov_10a_exp/default/table) | Dépenses publiques par fonction (COFOG) et par administration | Eurostat |
+| [Rapport sur les aides publiques aux entreprises](https://www.tresor.economie.gouv.fr/Articles/2026/10/14/aides-publiques-aux-entreprises-un-nouveau-jaune-budgetaire-pour-mieux-les-recenser) | Dispositifs d'aide et montants (annexe au PLF 2027). PDF repris à la main une fois par an dans `ref/` | Gouvernement |
 
 Toutes sont accessibles sans clé d'API. Le catalogue est dans [finances_etat/sources.py](finances_etat/sources.py) :
 les pièces jointes DGFiP sont repérées par leur titre, car leurs identifiants changent quand le fichier est republié.
@@ -58,6 +59,8 @@ les pièces jointes DGFiP sont repérées par leur titre, car leurs identifiants
   et comment chaque administration dépense (au prorata, par fonction) ; d'où vient et où va l'argent du budget de l'État,
   des impôts bruts aux dépenses, en passant par les montants rendus aux contribuables et l'emprunt.
 - **Recettes** et **Dépenses** : évolution annuelle par impôt et par nature, suivi mensuel de l'année en cours.
+- **Aides aux entreprises** : montant total selon le périmètre, composition, comparaison des estimations et
+  100 premiers dispositifs. Pas de classement par entreprise : aucune source publique ne le permet.
 - **Prévu vs réalisé** : LFI, dernière loi rectificative et exécution, écarts.
 - **Comptes de l'État** : compte de résultat, charges par mission, bilan (comptabilité générale).
 - **Qualité et sources** : résultats des contrôles, anomalies documentées, journal des collectes.
@@ -91,6 +94,7 @@ ou depuis Python, Excel ou Power BI via ODBC. Les vues principales :
 | `v_budget_annuel` | LFI, dernière LFR et exécution par année |
 | `v_prelevements` | prélèvements obligatoires par type et par administration bénéficiaire |
 | `v_depenses_fonction` | dépenses de chaque administration par fonction |
+| `v_aides_entreprises` | aides publiques aux entreprises, par dispositif |
 | `v_compte_resultat`, `v_bilan`, `v_charges_par_mission` | comptabilité générale de l'État |
 | `v_maastricht` | déficit et dette publics |
 

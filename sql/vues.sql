@@ -174,3 +174,15 @@ SELECT
 FROM stg_eurostat_cofog d
 JOIN ref_administrations a USING (sector)
 JOIN ref_fonctions f USING (cofog99);
+
+-- Aides publiques aux entreprises : dispositifs listés en annexe du rapport joint au PLF 2027.
+-- P1 = périmètre socle ; P2 = ce que le périmètre élargi ajoute au socle. État et opérateurs seulement.
+-- Montant vide : valeur « ε » (négligeable), « nc » (non chiffré) ou « - » dans la source.
+CREATE OR REPLACE VIEW v_aides_entreprises AS
+SELECT
+    annee, instrument,
+    CASE perimetre WHEN 'P1' THEN 'socle' ELSE 'elargi' END AS perimetre,
+    numero, dispositif, rattachement, type,
+    montant_m * 1e6 AS montant,
+    montant_source, page, entreprise
+FROM ref_aides_entreprises;

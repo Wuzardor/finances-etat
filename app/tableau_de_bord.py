@@ -350,7 +350,8 @@ aux collectivités. Les recettes de l'État n'en montrent que sa part.
 avec provisions et amortissements.
 """)
 
-NOMS_ONGLETS = ["Vue d'ensemble", "Circuits de l'argent", "Recettes", "Dépenses", "Prévu vs réalisé",
+NOMS_ONGLETS = ["Vue d'ensemble", "Circuits de l'argent", "Recettes", "Dépenses", "Aides aux entreprises",
+                "Prévu vs réalisé",
                 "Comptes de l'État", "Qualité et sources", "Méthodologie"]
 onglet = dict(zip(NOMS_ONGLETS, st.tabs(NOMS_ONGLETS)))
 
@@ -629,6 +630,107 @@ with onglet["Dépenses"]:
     graphique_cumul(choix)
 
 # ---------------------------------------------------------------------------
+# Aides aux entreprises : combien, sous quelle forme, quels dispositifs
+# ---------------------------------------------------------------------------
+INSTRUMENTS_AIDES = {"budgetaire": "Aides budgétaires", "fiscale": "Aides fiscales",
+                     "sociale": "Exonérations de cotisations", "financiere": "Aides financières"}
+
+with onglet["Aides aux entreprises"]:
+    totaux_ae = requete("SELECT * FROM ref_aides_totaux")
+    an_ae = int(totaux_ae["annee"].max())
+    totaux_ae = totaux_ae[totaux_ae["annee"] == an_ae].set_index(["instrument", "perimetre"])["montant_md"]
+    aides = requete("""
+        SELECT dispositif, instrument, perimetre, montant / 1e6 AS m, entreprise
+        FROM v_aides_entreprises WHERE annee = ? ORDER BY m DESC NULLS LAST
+    """, an_ae)
+    pib = requete("SELECT dette / dette_pct_pib * 100 / 1e9 AS pib FROM v_maastricht WHERE annee = ?", an_ae)["pib"].iloc[0]
+    socle, elargi = totaux_ae[("ensemble", "socle")], totaux_ae[("ensemble", "elargi")]
+    cir = aides.loc[aides["dispositif"] == "Crédit d’impôt en faveur de la recherche", "m"].iloc[0] / 1e3
+
+    st.caption(f"Aides de l'État et de ses opérateurs en {an_ae}. Les aides des collectivités locales et de l'Union "
+               "européenne n'y figurent pas, faute de données harmonisées.")
+    k1, k2, k3, k4 = st.columns(4)
+    for col, titre, valeur, detail, aide in [
+        (k1, "Périmètre socle", socle, f"{nombre(socle / pib * 100)} % du PIB",
+         "Dispositifs qui remplissent sans ambiguïté les trois critères de la définition : ressources publiques, "
+         "bénéficiaire exerçant une activité économique, avantage identifiable sans contrepartie équivalente."),
+        (k2, "Périmètre élargi", elargi, f"{nombre(elargi / pib * 100)} % du PIB",
+         "Ajoute au socle les dispositifs dont au moins un critère est discuté : allègements généraux de cotisations, "
+         "taux réduits de TVA, formation professionnelle, retraites de La Poste et d'Orange."),
+        (k3, "Allègements généraux", totaux_ae[("sociale", "complement")], "périmètre élargi",
+         "Baisses de cotisations patronales sur les bas et moyens salaires. Le CICE, supprimé en 2019, a été remplacé "
+         "par un allègement de cotisations."),
+        (k4, "Crédit d'impôt recherche", cir, "périmètre socle", "Premier dispositif du périmètre socle."),
+    ]:
+        col.metric(titre, f"{nombre(valeur)} Md€", delta=detail, delta_color="off", border=True, help=aide)
+
+    st.markdown(f"**En {an_ae}, l'État et ses opérateurs ont consacré entre {nombre(socle)} et {nombre(elargi)} Md€ aux "
+                "aides aux entreprises, selon le périmètre retenu.** L'écart tient surtout aux allègements généraux de "
+                "cotisations et aux taux réduits de TVA, qui profitent aussi aux salariés et aux consommateurs.")
+
+    st.subheader("De quoi se composent ces montants")
+    composition = pd.DataFrame([
+        ("Aides fiscales", "fiscale", "socle", "Socle"), ("Aides budgétaires", "budgetaire", "socle", "Socle"),
+        ("Exonérations ciblées de cotisations", "sociale", "socle", "Socle"),
+        ("Aides financières bonifiées", "financiere", "socle", "Socle"),
+        ("Allègements généraux de cotisations", "sociale", "complement", "Ajouté par le périmètre élargi"),
+        ("Taux réduits de TVA", "fiscale", "complement", "Ajouté par le périmètre élargi"),
+        ("Formation professionnelle, retraites La Poste et Orange", "budgetaire", "complement",
+         "Ajouté par le périmètre élargi"),
+    ], columns=["poste", "instrument", "perimetre", "serie"])
+    composition["md"] = [totaux_ae[(i, p)] for i, p in zip(composition["instrument"], composition["perimetre"])]
+    composition = composition.sort_values("md")
+    fig = go.Figure()
+    for (serie, groupe), couleur in zip(composition.groupby("serie", sort=False), SERIES):
+        fig.add_bar(y=groupe["poste"], x=groupe["md"], orientation="h", name=serie, marker_color=couleur,
+                    hovertemplate="%{x:,.1f} Md€")
+    habiller(fig, 360, unite="", survol="y unified")
+    fig.update_layout(barmode="stack", yaxis=dict(categoryorder="array", categoryarray=composition["poste"].tolist()))
+    fig.update_xaxes(title="Md€", gridcolor=C["grille"], showgrid=True)
+    fig.update_yaxes(showgrid=False)
+    afficher(fig, composition[["poste", "serie", "md"]].rename(columns={"serie": "périmètre", "md": "Md€"}))
+
+    st.subheader("Pourquoi les chiffres diffèrent d'une source à l'autre")
+    st.caption("Il n'existe pas de définition unique. Ces estimations ne portent ni sur la même année ni sur le même champ.")
+    st.dataframe(pd.DataFrame([
+        {"source": "Rapport annexé au PLF 2027", "année": 2024, "sens étroit (Md€)": 59.8, "sens large (Md€)": 166.1,
+         "champ": "État et opérateurs, hors collectivités et Union européenne"},
+        {"source": "Haut-commissariat à la stratégie et au plan", "année": 2025, "sens étroit (Md€)": 82.0,
+         "sens large (Md€)": 187.0, "champ": "Inclut les aides des collectivités et les interventions financières"},
+        {"source": "Commission d'enquête du Sénat", "année": 2023, "sens étroit (Md€)": 108.0, "sens large (Md€)": 211.0,
+         "champ": "Le sens large inclut toute l'activité de Bpifrance et des dépenses fiscales déclassées"},
+    ]), hide_index=True)
+
+    st.subheader("Les 100 premiers dispositifs")
+    choix_ae = st.selectbox("Périmètre", ["Périmètre élargi", "Périmètre socle"], key="perimetre_ae")
+    liste = aides if choix_ae == "Périmètre élargi" else aides[aides["perimetre"] == "socle"]
+    chiffres = liste.dropna(subset=["m"])
+    st.caption(f"{len(liste)} dispositifs recensés dans ce périmètre. Les dix premiers représentent "
+               f"{pct(chiffres['m'].head(10).sum() / chiffres['m'].sum())} du montant. Il s'agit de dispositifs, pas "
+               "d'entreprises.")
+    top = chiffres.head(100).assign(rang=lambda d: range(1, len(d) + 1),
+                                    instrument=lambda d: d["instrument"].map(INSTRUMENTS_AIDES),
+                                    perimetre=lambda d: d["perimetre"].map({"socle": "socle", "elargi": "élargi"}))
+    st.dataframe(top[["rang", "dispositif", "instrument", "perimetre", "m"]], hide_index=True, height=420,
+                 column_config={"rang": st.column_config.NumberColumn("rang", width="small"),
+                                "dispositif": st.column_config.TextColumn("dispositif", width="large"),
+                                "perimetre": "périmètre",
+                                "m": st.column_config.NumberColumn("montant (M€)", format="%.0f")})
+
+    st.subheader("Et par entreprise ?")
+    st.info("**Aucune source publique ne donne le montant total reçu par chaque entreprise.** Le montant d'un crédit "
+            "d'impôt est couvert par le secret professionnel, et les allègements de cotisations ne sont pas publiés "
+            "par employeur. Un classement complet des bénéficiaires n'est donc pas possible à partir des données "
+            "ouvertes.", icon=":material/info:")
+    st.caption("Seules quelques lignes du rapport nomment une entreprise. Elles ne donnent pas le total reçu par ces "
+               "entreprises, seulement le montant de la ligne.")
+    nommees = aides.dropna(subset=["entreprise"])
+    st.dataframe(nommees[["entreprise", "dispositif", "m"]], hide_index=True,
+                 column_config={"m": st.column_config.NumberColumn("montant (M€)", format="%.0f")})
+    st.caption(f"Source : rapport relatif aux aides publiques aux entreprises, annexe au projet de loi de finances pour "
+               f"2027 (exécution {an_ae}). Montants publiés en ordre de grandeur.")
+
+# ---------------------------------------------------------------------------
 # Prévu vs réalisé
 # ---------------------------------------------------------------------------
 with onglet["Prévu vs réalisé"]:
@@ -745,7 +847,8 @@ with onglet["Comptes de l'État"]:
 # ---------------------------------------------------------------------------
 JEUX = {"smb": "Situations mensuelles", "lfi": "LFI", "lfr": "Dernière LFR", "execution": "Exécution (fichier des lois)",
         "execution_vs_smb": "Exécution vs SMB de décembre", "compta": "Comptabilité générale",
-        "lois": "Lois de finances", "eurostat": "Eurostat (impôts, dépenses par fonction)"}
+        "lois": "Lois de finances", "eurostat": "Eurostat (impôts, dépenses par fonction)",
+        "aides": "Aides aux entreprises"}
 
 with onglet["Qualité et sources"]:
     ctl = requete("SELECT * FROM meta_controles")
@@ -832,6 +935,10 @@ conservés, puis transformés par un programme dont chaque étape est décrite c
          "contenu": "Dépenses des administrations par fonction (nomenclature COFOG)",
          "période": f"{couverture['po_debut']} à {couverture['po_fin']}", "rythme": "annuel",
          "lien": "https://ec.europa.eu/eurostat/databrowser/view/gov_10a_exp/default/table"},
+        {"source": "Rapport relatif aux aides publiques aux entreprises", "producteur": "Gouvernement",
+         "contenu": "Liste des dispositifs d'aide et montant de chacun (annexe au projet de loi de finances)",
+         "période": "2024", "rythme": "annuel, repris à la main depuis le PDF",
+         "lien": "https://www.tresor.economie.gouv.fr/Articles/2026/10/14/aides-publiques-aux-entreprises-un-nouveau-jaune-budgetaire-pour-mieux-les-recenser"},
     ]), hide_index=True, column_config={"lien": st.column_config.LinkColumn("lien", display_text="ouvrir")})
     st.caption("Les situations mensuelles paraissent environ 5 semaines après la fin du mois. Toutes les sources sont "
                "en accès libre, sans clé d'API. La version exacte de chaque fichier utilisé figure dans l'onglet "
@@ -910,6 +1017,13 @@ se comparent pas directement aux dépenses budgétaires, comptées en caisse.
 
 **Déficit et dette publics.** Ils couvrent toutes les administrations publiques (État, Sécurité sociale,
 collectivités), au sens du traité de Maastricht, et sont repris d'Eurostat sans retraitement.
+
+**Aides aux entreprises.** La liste et les montants viennent des annexes du rapport joint au projet de loi de
+finances pour 2027. Ce PDF n'existe pas en données ouvertes : ses tableaux sont repris une fois par an dans
+`ref/aides_entreprises.csv`, et la somme des lignes est comparée aux totaux publiés. Le rapport couvre l'État et
+ses opérateurs, pas les collectivités ni l'Union européenne, et une seule année. L'annexe et la synthèse divergent
+sur une ligne de 550 M€, signalée dans l'onglet « Qualité et sources » : les totaux affichés sont ceux de la
+synthèse, la liste des dispositifs est celle de l'annexe.
 """)
 
     st.subheader("Contrôles de qualité")
@@ -940,6 +1054,8 @@ explication ; sinon, il apparaît comme nouvelle alerte. Le détail est dans l'o
   la TVA.
 - Les montants Eurostat (comptabilité nationale, champ « État et organismes centraux ») diffèrent légèrement de
   ceux du budget de l'État.
+- Les **aides aux entreprises** ne sont connues que par dispositif, sur une seule année et hors collectivités.
+  Aucune source publique ne donne le total reçu par chaque entreprise.
 - Les producteurs peuvent réviser les données des dernières années ; les chiffres affichés sont ceux de la
   dernière publication téléchargée.
 - Les sources ne sont pas corrigées : les anomalies relevées sont signalées, pas retraitées. Seule exception,
