@@ -50,6 +50,11 @@ def base(tmp_path_factory):
     con.close()
 
 
+def dernier_mois(base) -> str:
+    """Mois de la dernière situation mensuelle : celui que le point mensuel a déjà traité dans les journaux ci-dessous."""
+    return base.sql("SELECT strftime(max(date_arrete), '%Y-%m') FROM stg_smb").fetchone()[0]
+
+
 @pytest.mark.parametrize("modele", [*P.CATALOGUE, P.point_mensuel, P.lancement], ids=lambda m: m.__name__)
 def test_modeles_sur_les_donnees_reelles(base, modele, tmp_path):
     post = modele(base, tmp_path, LUNDI)
@@ -74,7 +79,7 @@ def test_choix_des_posts(base, tmp_path):
     journal = [{"date": "2026-09-27", "modele": "lancement", "cle": "1"}]
     assert modeles(LUNDI, journal) == ["point_mensuel", "prevu_realise"]
 
-    journal += [{"date": "2026-09-28", "modele": "point_mensuel", "cle": "2026-07"},
+    journal += [{"date": "2026-09-28", "modele": "point_mensuel", "cle": dernier_mois(base)},
                 {"date": "2026-09-28", "modele": "prevu_realise", "cle": "2025"}]
     assert modeles(LUNDI + timedelta(days=1), journal) == []  # mardi : ni nouveau mois ni jour thématique
     assert modeles(LUNDI + timedelta(days=3), journal, en_attente=3) == []  # jeudi, mais trop de posts en attente
@@ -83,7 +88,7 @@ def test_choix_des_posts(base, tmp_path):
 
 def test_un_modele_n_est_repropose_qu_avec_des_donnees_nouvelles_ou_apres_six_mois(base, tmp_path):
     journal = [{"date": "2026-01-05", "modele": "lancement", "cle": "1"},
-               {"date": "2026-01-05", "modele": "point_mensuel", "cle": "2026-07"}]
+               {"date": "2026-01-05", "modele": "point_mensuel", "cle": dernier_mois(base)}]
     journal += [{"date": "2026-01-05", "modele": m.__name__, "cle": m(base, tmp_path, LUNDI).cle} for m in P.CATALOGUE]
     assert R.choisir(base, date(2026, 3, 2), journal, 0, tmp_path) == []  # mêmes données, moins de 6 mois
     assert [p.modele for p in R.choisir(base, date(2026, 7, 6), journal, 0, tmp_path)] == ["prevu_realise"]
