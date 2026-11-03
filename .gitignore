@@ -6,3 +6,6 @@ data/*
 __pycache__/
 .pytest_cache/
 .claude/
+
+# Copie locale des posts X à publier à la main
+promo/a_poster/
