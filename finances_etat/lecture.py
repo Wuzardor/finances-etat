@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 
 from .texte import cle_libelle
@@ -121,3 +122,30 @@ def lire_jsonstat(chemin: Path) -> pd.DataFrame:
             {dim: positions[n][c] for n, (dim, c) in enumerate(zip(dimensions, coord))} | {"valeur": valeur}
         )
     return pd.DataFrame(enregistrements)
+
+
+def lire_cps(chemin: Path) -> pd.DataFrame:
+    """Comptes de la protection sociale (DREES) : une ligne par année, prestation et régime.
+
+    La source donne les montants en millions d'euros et les niveaux sous forme de texte. Le nom
+    du régime reçoit une clé de rapprochement avec ref/regimes_retraite.csv.
+    """
+    con = duckdb.connect()
+    try:
+        df = con.execute("""
+            SELECT
+                CAST(annee AS INTEGER)     AS annee,
+                CAST(ps_niveau AS INTEGER) AS niveau_prestation,
+                ps_code                    AS code_prestation,
+                ps_lib                     AS prestation,
+                risque,
+                CAST(si_niveau AS INTEGER) AS niveau_regime,
+                si_code                    AS secteur,
+                nom_regime                 AS regime,
+                val * 1e6                  AS montant
+            FROM read_parquet(?)
+        """, [str(chemin)]).df()
+    finally:
+        con.close()
+    df["cle_regime"] = df["regime"].map(cle_libelle)
+    return df

@@ -14,7 +14,7 @@ import pandas as pd
 from .collecte import JOURNAL, dernier_fichier
 from .config import DB_PATH, REF_DIR, SQL_DIR
 from .controles import executer_controles
-from .lecture import lire_jsonstat, lire_lois, lire_smb
+from .lecture import lire_cps, lire_jsonstat, lire_lois, lire_smb
 from .sources import SOURCES
 from .texte import cle_libelle
 
@@ -56,6 +56,8 @@ def construire(chemin_base: Path = DB_PATH) -> Path:
                     ["annee", "texte_code"])
     eurostat = {cle: lire_jsonstat(fichiers[cle]).rename(columns={"time": "annee"}).astype({"annee": int})
                 for cle in ("eurostat_apu", "eurostat_impots", "eurostat_cofog")}
+    regimes = pd.read_csv(REF_DIR / "regimes_retraite.csv")
+    regimes["cle_regime"] = regimes["regime"].map(cle_libelle)
     sources = pd.DataFrame([{**vars(s), "fichier": fichiers[s.cle].name} for s in SOURCES])
     journal = pd.read_csv(JOURNAL) if JOURNAL.exists() else pd.DataFrame(columns=COLONNES_JOURNAL)
 
@@ -67,6 +69,7 @@ def construire(chemin_base: Path = DB_PATH) -> Path:
         for nom, df in [("ref_lignes", ref),
                         ("ref_administrations", pd.read_csv(REF_DIR / "administrations.csv")),
                         ("ref_fonctions", pd.read_csv(REF_DIR / "fonctions_cofog.csv")),
+                        ("ref_regimes_retraite", regimes),
                         ("ref_aides_entreprises", pd.read_csv(REF_DIR / "aides_entreprises.csv",
                                                               dtype={"numero": str})),
                         ("ref_aides_totaux", pd.read_csv(REF_DIR / "aides_entreprises_totaux.csv")),
@@ -74,6 +77,7 @@ def construire(chemin_base: Path = DB_PATH) -> Path:
                         ("stg_eurostat", eurostat["eurostat_apu"]),
                         ("stg_eurostat_impots", eurostat["eurostat_impots"]),
                         ("stg_eurostat_cofog", eurostat["eurostat_cofog"]),
+                        ("stg_cps", lire_cps(fichiers["drees_cps"])),
                         ("meta_sources", sources), ("meta_collectes", journal)]:
             _creer(con, nom, df)
 

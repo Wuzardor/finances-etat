@@ -9,8 +9,8 @@ collecte automatique, base de données analytique, contrôles de cohérence et t
  Sources open data            data/raw/              DuckDB                     Streamlit
  ─────────────────            ─────────              ──────                     ─────────
  DGFiP (data.economie)  ──►   fichiers bruts   ──►   tables stg_*          ──►  tableau de bord
- Eurostat (API)               historisés,            vues v_* (analyses)        9 onglets
-                              journal.csv            meta_controles (qualité)
+ Eurostat (API)               historisés,            vues v_* (analyses)        10 onglets
+ DREES (data.drees)           journal.csv            meta_controles (qualité)
 ```
 
 Projet indépendant, sans lien avec l'administration. Pour signaler une erreur ou proposer une amélioration,
@@ -46,6 +46,7 @@ uv run --group dev pytest                     # tests
 | [gov_10dd_edpt1](https://ec.europa.eu/eurostat/databrowser/view/gov_10dd_edpt1/default/table) | Déficit et dette publics au sens de Maastricht | Eurostat |
 | [gov_10a_taxag](https://ec.europa.eu/eurostat/databrowser/view/gov_10a_taxag/default/table) | Impôts et cotisations par administration bénéficiaire (État, Sécurité sociale, collectivités, UE) | Eurostat |
 | [gov_10a_exp](https://ec.europa.eu/eurostat/databrowser/view/gov_10a_exp/default/table) | Dépenses publiques par fonction (COFOG) et par administration | Eurostat |
+| [Comptes de la protection sociale](https://data.drees.solidarites-sante.gouv.fr/explore/dataset/305_les-comptes-de-la-protection-sociale/) | Prestations sociales par risque et par régime depuis 1959, dont les pensions de retraite versées par chaque caisse (détail depuis 2020) | DREES |
 | [Rapport sur les aides publiques aux entreprises](https://www.tresor.economie.gouv.fr/Articles/2026/10/14/aides-publiques-aux-entreprises-un-nouveau-jaune-budgetaire-pour-mieux-les-recenser) | Dispositifs d'aide et montants (annexe au PLF 2027). PDF repris à la main une fois par an dans `ref/` | Gouvernement |
 
 Toutes sont accessibles sans clé d'API. Le catalogue est dans [finances_etat/sources.py](finances_etat/sources.py) :
@@ -59,6 +60,8 @@ les pièces jointes DGFiP sont repérées par leur titre, car leurs identifiants
   et comment chaque administration dépense (au prorata, par fonction) ; d'où vient et où va l'argent du budget de l'État,
   des impôts bruts aux dépenses, en passant par les montants rendus aux contribuables et l'emprunt.
 - **Recettes** et **Dépenses** : évolution annuelle par impôt et par nature, suivi mensuel de l'année en cours.
+- **Retraites** : pensions versées chaque année par l'ensemble des régimes obligatoires, réparties entre régime
+  général, Agirc-Arrco, État, régimes spéciaux et autres caisses ; prestations vieillesse-survie depuis 1959.
 - **Aides aux entreprises** : montant total selon le périmètre, composition, comparaison des estimations et
   100 premiers dispositifs. Pas de classement par entreprise : aucune source publique ne le permet.
 - **Prévu vs réalisé** : LFI, dernière loi rectificative et exécution, écarts.
@@ -72,13 +75,14 @@ les pièces jointes DGFiP sont repérées par leur titre, car leurs identifiants
 finances_etat/
   sources.py       catalogue des sources
   collecte.py      téléchargement, historisation (SHA-256), journal
-  lecture.py       lecture des formats DGFiP (UTF-16, gzip, virgule décimale) et JSON-stat Eurostat
+  lecture.py       lecture des formats DGFiP (UTF-16, gzip, virgule décimale), JSON-stat Eurostat et DREES
   construction.py  construction de la base DuckDB (fichier temporaire puis remplacement atomique)
   controles.py     contrôles de cohérence
   pipeline.py      point d'entrée : python -m finances_etat
   promo/           posts X : modèles de textes, graphiques, choix du jour, publication
 sql/vues.sql       vues analytiques (v_*) utilisées par le tableau de bord
-ref/               référentiels : lignes budgétaires, fonctions, administrations, anomalies connues
+ref/               référentiels : lignes budgétaires, fonctions, administrations, régimes de retraite,
+                   anomalies connues
 app/               tableau de bord Streamlit
 tests/             tests unitaires
 ```

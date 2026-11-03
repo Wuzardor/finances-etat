@@ -175,6 +175,42 @@ FROM stg_eurostat_cofog d
 JOIN ref_administrations a USING (sector)
 JOIN ref_fonctions f USING (cofog99);
 
+-- Retraites, tous régimes (comptes de la protection sociale, DREES) : pensions de droit direct
+-- (E11-21.1) et de droit dérivé, c'est-à-dire de réversion (E11-22.1), versées par les régimes
+-- obligatoires de base et complémentaires. La retraite supplémentaire (organismes d'assurance et
+-- fonds de pension, secteurs S12) est exclue, comme dans les publications de la DREES. Un régime
+-- absent de ref/regimes_retraite.csv est classé dans « Autres régimes » (et signalé par un contrôle).
+CREATE OR REPLACE VIEW v_retraites_regimes AS
+SELECT
+    c.annee,
+    coalesce(r.groupe, 'Autres régimes') AS groupe,
+    sum(c.montant) FILTER (WHERE c.code_prestation = 'E11-21.1') AS droit_direct,
+    sum(c.montant) FILTER (WHERE c.code_prestation = 'E11-22.1') AS droit_derive,
+    sum(c.montant) AS montant
+FROM stg_cps c
+LEFT JOIN ref_regimes_retraite r USING (cle_regime)
+WHERE c.niveau_regime = 2
+  AND c.code_prestation IN ('E11-21.1', 'E11-22.1')
+  AND c.secteur NOT LIKE 'S12%'
+GROUP BY ALL;
+
+-- Total des pensions et part dans le PIB. Le PIB est déduit de la dette publique et de son
+-- ratio au PIB (Eurostat).
+CREATE OR REPLACE VIEW v_retraites AS
+SELECT
+    r.annee,
+    sum(r.montant) AS montant,
+    sum(r.montant) / any_value(m.dette / m.dette_pct_pib * 100) AS part_pib
+FROM v_retraites_regimes r
+LEFT JOIN v_maastricht m USING (annee)
+GROUP BY r.annee;
+
+-- Toutes les prestations du risque vieillesse-survie, tous régimes, depuis 1959 : les pensions,
+-- mais aussi le minimum vieillesse, les prestations liées à la dépendance et la retraite supplémentaire.
+CREATE OR REPLACE VIEW v_vieillesse_survie AS
+SELECT annee, montant
+FROM stg_cps
+WHERE code_prestation = 'E11-2' AND niveau_regime = 0;
 -- Aides publiques aux entreprises : dispositifs listés en annexe du rapport joint au PLF 2027.
 -- P1 = périmètre socle ; P2 = ce que le périmètre élargi ajoute au socle. État et opérateurs seulement.
 -- Montant vide : valeur « ε » (négligeable), « nc » (non chiffré) ou « - » dans la source.

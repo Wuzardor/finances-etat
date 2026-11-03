@@ -12,6 +12,9 @@ ODS_PAGE = "https://data.economie.gouv.fr/explore/dataset"
 SMB_DATASET = "situations-mensuelles-budgetaires-series-longues"
 COMPTA_DATASET = "balances_des_comptes_etat"
 EUROSTAT_API = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
+DREES_API = "https://data.drees.solidarites-sante.gouv.fr/api/explore/v2.1/catalog/datasets"
+DREES_PAGE = "https://data.drees.solidarites-sante.gouv.fr/explore/dataset"
+CPS_DATASET = "305_les-comptes-de-la-protection-sociale"
 
 
 @dataclass(frozen=True)
@@ -109,6 +112,14 @@ SOURCES: list[Source] = [
             + "".join(f"&cofog99=GF{i:02d}" for i in range(1, 11))
             + "&cofog99=TOTAL&format=JSON&lang=fr"
         ),
+    ),
+    Source(
+        cle="drees_cps",
+        titre="Comptes de la protection sociale : prestations sociales par régime, dont les pensions de retraite",
+        producteur="DREES",
+        page=f"{DREES_PAGE}/{CPS_DATASET}/",
+        extension="parquet",
+        url=f"{DREES_API}/{CPS_DATASET}/exports/parquet",
     ),
 ]
 

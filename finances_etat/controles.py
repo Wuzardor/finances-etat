@@ -118,6 +118,16 @@ def executer_controles(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
                   "periode": str(annee), "ecart": ecart, "unite": "€", "tolerance": 0.5e9,
                   "detail": administration})
 
+    for annee, ecart in con.sql("""
+        SELECT annee, sum(montant) FILTER (WHERE niveau_regime = 0) - sum(montant) FILTER (WHERE niveau_regime = 2)
+        FROM stg_cps
+        WHERE code_prestation IN ('E11-21.1', 'E11-22.1')
+        GROUP BY annee
+    """).fetchall():
+        r.append({"jeu": "drees", "code": "pensions_regimes",
+                  "controle": "Pensions de retraite : somme des régimes = total tous régimes",
+                  "periode": str(annee), "ecart": ecart, "unite": "€", "tolerance": TOLERANCE_EUROS})
+
     for annee, instrument, perimetre, ecart in con.sql("""
         WITH lignes AS (
             SELECT annee, instrument, perimetre, sum(montant) AS montant FROM v_aides_entreprises GROUP BY ALL
@@ -147,6 +157,16 @@ def executer_controles(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
                   "controle": "Tous les libellés sont référencés dans ref/lignes_budget.csv",
                   "periode": "toutes", "ecart": float(len(inconnus)), "unite": "libellés", "tolerance": 0.0,
                   "detail": " | ".join(lib for (lib,) in inconnus) or None})
+
+    inconnus = con.sql("""
+        SELECT DISTINCT regime FROM stg_cps
+        WHERE niveau_regime = 2 AND code_prestation IN ('E11-21.1', 'E11-22.1') AND secteur NOT LIKE 'S12%'
+          AND cle_regime NOT IN (SELECT cle_regime FROM ref_regimes_retraite)
+    """).fetchall()
+    r.append({"jeu": "drees", "code": "regimes_references",
+              "controle": "Tous les régimes de retraite sont référencés dans ref/regimes_retraite.csv",
+              "periode": "toutes", "ecart": float(len(inconnus)), "unite": "régimes", "tolerance": 0.0,
+              "detail": " | ".join(reg for (reg,) in inconnus) or None})
 
     df = pd.DataFrame(r)
     df["statut"] = (df["ecart"].abs() <= df["tolerance"]).map({True: "ok", False: "alerte"})

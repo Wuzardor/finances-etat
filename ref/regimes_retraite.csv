@@ -1,0 +1,15 @@
+regime,groupe,ordre
+Caisse nationale d’assurance vieillesse,Régime général,1
+Association générale des institutions de retraite des cadres et association des régimes de retraite complémentaire des salariés,Agirc-Arrco,2
+Régimes pour les agents de l'Etat (y compris ex-L),État,3
+Régime d'intervention sociale de l'État,État,3
+Autres régimes spéciaux,Régimes spéciaux,4
+Exploitants agricoles,Agricoles et indépendants,5
+Régime des salariés agricoles,Agricoles et indépendants,5
+CNAVPL base complementaire,Agricoles et indépendants,5
+Autres régimes non salariés,Agricoles et indépendants,5
+Institution de retraite complémentaire des agents non titulaires de l’État et des collectivités publiques,Autres régimes,6
+Autres régimes complémentaires de salariés,Autres régimes,6
+Autres regimes privés,Autres régimes,6
+Caisse nationale d’assurance maladie,Autres régimes,6
+Autres organismes du régime général,Autres régimes,6

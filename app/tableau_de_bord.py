@@ -301,7 +301,7 @@ annee_courante = dernier_arrete.year
 fin_mois = f"fin {MOIS_LONG[dernier_arrete.month - 1]}"
 
 st.title("Finances de l'État")
-st.caption(f"Exécution budgétaire au {date_longue(dernier_arrete)} · données open data DGFiP et Eurostat, "
+st.caption(f"Exécution budgétaire au {date_longue(dernier_arrete)} · données open data DGFiP, Eurostat et DREES, "
            f"mises à jour le {mise_a_jour:%d/%m/%Y}")
 
 INDEPENDANT = "**Site indépendant, gratuit et sans publicité**, sans lien avec l'administration."
@@ -325,7 +325,7 @@ with st.container(border=True):
 
 with st.sidebar:
     st.subheader("Le projet")
-    st.markdown(f"{INDEPENDANT} Construit à partir des données publiques de la DGFiP et d'Eurostat : "
+    st.markdown(f"{INDEPENDANT} Construit à partir des données publiques de la DGFiP, d'Eurostat et de la DREES : "
                 "la méthode est détaillée dans l'onglet « Méthodologie ».")
     if URL_SOUTIEN:
         bouton_soutien(st)
@@ -350,8 +350,8 @@ aux collectivités. Les recettes de l'État n'en montrent que sa part.
 avec provisions et amortissements.
 """)
 
-NOMS_ONGLETS = ["Vue d'ensemble", "Circuits de l'argent", "Recettes", "Dépenses", "Aides aux entreprises",
-                "Prévu vs réalisé",
+NOMS_ONGLETS = ["Vue d'ensemble", "Circuits de l'argent", "Recettes", "Dépenses", "Retraites",
+                "Aides aux entreprises", "Prévu vs réalisé",
                 "Comptes de l'État", "Qualité et sources", "Méthodologie"]
 onglet = dict(zip(NOMS_ONGLETS, st.tabs(NOMS_ONGLETS)))
 
@@ -630,6 +630,71 @@ with onglet["Dépenses"]:
     graphique_cumul(choix)
 
 # ---------------------------------------------------------------------------
+# Retraites : toutes les caisses, pas seulement l'État
+# ---------------------------------------------------------------------------
+with onglet["Retraites"]:
+    groupes = requete("SELECT groupe FROM ref_regimes_retraite GROUP BY groupe ORDER BY min(ordre)")["groupe"].tolist()
+    regimes = requete("SELECT annee, groupe AS serie, montant / 1e9 AS md FROM v_retraites_regimes ORDER BY annee")
+    totaux = requete("SELECT annee, montant / 1e9 AS md, part_pib FROM v_retraites ORDER BY annee").set_index("annee")
+    par_groupe = regimes.pivot_table(index="annee", columns="serie", values="md", aggfunc="sum")
+    an_ret = int(totaux.index.max())
+
+    st.caption(f"Toutes les caisses de retraite obligatoires, pas seulement l'État. Données {an_ret} : les comptes de "
+               "la protection sociale (DREES) paraissent en fin d'année suivante.")
+    k1, k2, k3, k4 = st.columns(4)
+    for col, titre, serie, aide in [
+        (k1, f"Pensions versées en {an_ret}", totaux["md"],
+         "Pensions de retraite et de réversion versées par les régimes obligatoires, de base et complémentaires. "
+         "Hors retraite supplémentaire."),
+        (k2, "dont régime général", par_groupe.get("Régime général"), "Caisse nationale d'assurance vieillesse."),
+        (k3, "dont Agirc-Arrco", par_groupe.get("Agirc-Arrco"), "Retraite complémentaire des salariés du privé."),
+        (k4, "dont État", par_groupe.get("État"),
+         "Pensions des fonctionnaires civils et militaires de l'État, retraites du combattant."),
+    ]:
+        if serie is None or an_ret not in serie.index:
+            continue
+        ecart = serie[an_ret] - serie.get(an_ret - 1, float("nan"))
+        col.metric(titre, f"{nombre(serie[an_ret])} Md€",
+                   delta=None if pd.isna(ecart) else f"{'+' if ecart > 0 else ''}{nombre(ecart)} Md€ sur un an",
+                   delta_color="off", border=True, help=aide)
+
+    total_ret = totaux.loc[an_ret, "md"]
+    part_pib = totaux.loc[an_ret, "part_pib"]
+    dernier = par_groupe.loc[an_ret].dropna()
+    morceaux = [f"{nombre(dernier[g])} Md€ ({pct(dernier[g] / total_ret)}) {nom}"
+                for g, nom in [("Régime général", "versés par le régime général"), ("Agirc-Arrco", "par l'Agirc-Arrco"),
+                               ("État", "par l'État pour ses anciens fonctionnaires et militaires")] if g in dernier]
+    st.markdown(f"**En {an_ret}, les régimes de retraite obligatoires ont versé {nombre(total_ret)} Md€ de pensions"
+                + (f", soit {nombre(part_pib * 100)} % du PIB" if pd.notna(part_pib) else "") + ".** "
+                + (f"Dont {', '.join(morceaux[:-1])} et {morceaux[-1]}." if len(morceaux) > 1 else ""))
+
+    st.subheader("Pensions versées par régime")
+    st.caption("**Régime général** : CNAV, qui verse aussi depuis 2018 la retraite de base des artisans et commerçants. "
+               "**Agirc-Arrco** : complémentaire des salariés du privé. **État** : fonctionnaires civils et militaires "
+               "de l'État, retraites du combattant. **Régimes spéciaux** : notamment fonctionnaires territoriaux et "
+               "hospitaliers (CNRACL), SNCF, RATP, industries électriques et gazières, marins, mines. **Agricoles et "
+               "indépendants** : MSA (exploitants et salariés agricoles), professions libérales, autres non-salariés. "
+               "**Autres** : Ircantec (contractuels de la fonction publique), autres complémentaires, régimes d'entreprise.")
+    graphique_empile(regimes, [g for g in groupes if g in set(regimes["serie"])], dict(zip(groupes, SERIES)))
+    st.caption("Pensions de droit direct et de réversion, en milliards d'euros courants. Le détail par régime commence en "
+               "2020. Les pensions de l'État figurent aussi, en comptabilité générale, dans la mission « Pensions » de "
+               "l'onglet « Comptes de l'État ». Source : DREES, comptes de la protection sociale.")
+
+    st.subheader("Sur longue période : prestations vieillesse-survie")
+    vs = requete("SELECT annee, montant / 1e9 AS md FROM v_vieillesse_survie ORDER BY annee")
+    an_vs = int(vs["annee"].iloc[-1])
+    st.caption(f"Toutes les prestations liées à la vieillesse, tous régimes, depuis {int(vs['annee'].iloc[0])}, en "
+               "milliards d'euros courants (non corrigés de l'inflation) : les pensions, mais aussi le minimum "
+               "vieillesse, les aides à la dépendance et la retraite supplémentaire"
+               + (f" ({nombre(vs['md'].iloc[-1])} Md€ en {an_vs}, dont {nombre(totaux.loc[an_vs, 'md'])} Md€ de "
+                  "pensions des régimes obligatoires)." if an_vs in totaux.index else "."))
+    fig = go.Figure(go.Scatter(x=vs["annee"], y=vs["md"], mode="lines", line=dict(color=SERIES[0], width=2),
+                               hovertemplate="%{y:,.1f} Md€", name=""))
+    fig.update_xaxes(dtick=10)
+    afficher(habiller(fig, 320, legende=False),
+             vs.round(1).rename(columns={"md": "prestations vieillesse-survie (Md€)"}))
+
+# ---------------------------------------------------------------------------
 # Aides aux entreprises : combien, sous quelle forme, quels dispositifs
 # ---------------------------------------------------------------------------
 INSTRUMENTS_AIDES = {"budgetaire": "Aides budgétaires", "fiscale": "Aides fiscales",
@@ -848,7 +913,7 @@ with onglet["Comptes de l'État"]:
 JEUX = {"smb": "Situations mensuelles", "lfi": "LFI", "lfr": "Dernière LFR", "execution": "Exécution (fichier des lois)",
         "execution_vs_smb": "Exécution vs SMB de décembre", "compta": "Comptabilité générale",
         "lois": "Lois de finances", "eurostat": "Eurostat (impôts, dépenses par fonction)",
-        "aides": "Aides aux entreprises"}
+        "drees": "DREES (retraites)", "aides": "Aides aux entreprises"}
 
 with onglet["Qualité et sources"]:
     ctl = requete("SELECT * FROM meta_controles")
@@ -897,6 +962,9 @@ with onglet["Méthodologie"]:
             (SELECT max(annee) FROM v_maastricht WHERE dette_pct_pib IS NOT NULL) AS maas_fin,
             (SELECT min(annee) FROM v_prelevements)                               AS po_debut,
             (SELECT max(annee) FROM v_prelevements)                               AS po_fin,
+            (SELECT min(annee) FROM v_vieillesse_survie)                          AS cps_debut,
+            (SELECT min(annee) FROM v_retraites)                                  AS retraites_debut,
+            (SELECT max(annee) FROM v_retraites)                                  AS retraites_fin,
             (SELECT count(*) FROM meta_controles)                                 AS nb_controles,
             (SELECT count(*) FROM ref_lignes)                                     AS nb_lignes
     """).iloc[0]
@@ -935,6 +1003,12 @@ conservés, puis transformés par un programme dont chaque étape est décrite c
          "contenu": "Dépenses des administrations par fonction (nomenclature COFOG)",
          "période": f"{couverture['po_debut']} à {couverture['po_fin']}", "rythme": "annuel",
          "lien": "https://ec.europa.eu/eurostat/databrowser/view/gov_10a_exp/default/table"},
+        {"source": "Comptes de la protection sociale", "producteur": "DREES",
+         "contenu": "Prestations sociales par risque et par régime, dont les pensions de retraite versées par chaque "
+                    "caisse",
+         "période": f"{couverture['cps_debut']} à {couverture['retraites_fin']} (par régime : à partir de "
+                    f"{couverture['retraites_debut']})", "rythme": "annuel",
+         "lien": "https://data.drees.solidarites-sante.gouv.fr/explore/dataset/305_les-comptes-de-la-protection-sociale/"},
         {"source": "Rapport relatif aux aides publiques aux entreprises", "producteur": "Gouvernement",
          "contenu": "Liste des dispositifs d'aide et montant de chacun (annexe au projet de loi de finances)",
          "période": "2024", "rythme": "annuel, repris à la main depuis le PDF",
@@ -947,7 +1021,7 @@ conservés, puis transformés par un programme dont chaque étape est décrite c
     st.subheader("Chaîne de traitement")
     st.markdown(f"""
 1. **Collecte.** Chaque jour, une tâche automatique télécharge chaque source depuis l'API de
-   data.economie.gouv.fr ou d'Eurostat. Les fichiers DGFiP sont repérés par leur titre plutôt que par leur
+   data.economie.gouv.fr, d'Eurostat ou de la DREES. Les fichiers DGFiP sont repérés par leur titre plutôt que par leur
    identifiant, qui change à chaque republication.
 2. **Historisation.** Le fichier est conservé tel quel, horodaté, avec son empreinte SHA-256. Un fichier identique
    au précédent n'est pas réenregistré : on garde l'historique des versions publiées, sans doublon. Chaque
@@ -1018,6 +1092,13 @@ se comparent pas directement aux dépenses budgétaires, comptées en caisse.
 **Déficit et dette publics.** Ils couvrent toutes les administrations publiques (État, Sécurité sociale,
 collectivités), au sens du traité de Maastricht, et sont repris d'Eurostat sans retraitement.
 
+**Retraites.** Les pensions comptées sont celles de droit direct et de droit dérivé (réversion) versées par
+les régimes obligatoires, de base et complémentaires (postes E11-21.1 et E11-22.1 des comptes de la protection
+sociale). La retraite supplémentaire, versée par les organismes d'assurance et les fonds de pension, est exclue,
+comme dans les publications de la DREES ; le total peut en différer de moins de 1 Md€. Les régimes sont regroupés
+en six familles (référentiel `ref/regimes_retraite.csv`). La part dans le PIB utilise un PIB déduit de la dette
+publique et de son ratio au PIB (Eurostat). La série longue « vieillesse-survie » est plus large : elle comprend
+aussi le minimum vieillesse, les aides à la dépendance et la retraite supplémentaire.
 **Aides aux entreprises.** La liste et les montants viennent des annexes du rapport joint au projet de loi de
 finances pour 2027. Ce PDF n'existe pas en données ouvertes : ses tableaux sont repris une fois par an dans
 `ref/aides_entreprises.csv`, et la somme des lignes est comparée aux totaux publiés. Le rapport couvre l'État et
@@ -1038,9 +1119,10 @@ synthèse, la liste des dispositifs est celle de l'annexe.
   situations mensuelles ;
 - **équilibre de la balance** de la comptabilité générale (total des débits = total des crédits) ;
 - **totaux Eurostat** : la somme des catégories d'impôts et celle des fonctions retrouvent les totaux publiés ;
-- **complétude** : aucun mois manquant, aucun libellé absent du référentiel.
+- **totaux DREES** : la somme des pensions versées par chaque régime retrouve le total tous régimes ;
+- **complétude** : aucun mois manquant, aucun libellé ni régime de retraite absent des référentiels.
 
-L'écart admis est de 1 M€ pour les données DGFiP (arrondis) et de 0,5 Md€ pour les agrégats Eurostat. Un écart
+L'écart admis est de 1 M€ pour les données DGFiP et DREES (arrondis) et de 0,5 Md€ pour les agrégats Eurostat. Un écart
 ne bloque pas la mise à jour. S'il a déjà été analysé, il est classé « anomalie connue de la source », avec son
 explication ; sinon, il apparaît comme nouvelle alerte. Le détail est dans l'onglet « Qualité et sources ».
 """)
@@ -1054,6 +1136,8 @@ explication ; sinon, il apparaît comme nouvelle alerte. Le détail est dans l'o
   la TVA.
 - Les montants Eurostat (comptabilité nationale, champ « État et organismes centraux ») diffèrent légèrement de
   ceux du budget de l'État.
+- Les **retraites** couvrent toutes les caisses, pas seulement l'État. Le détail par régime ne commence qu'en
+  2020 et les comptes de la protection sociale paraissent avec environ un an de décalage.
 - Les **aides aux entreprises** ne sont connues que par dispositif, sur une seule année et hors collectivités.
   Aucune source publique ne donne le total reçu par chaque entreprise.
 - Les producteurs peuvent réviser les données des dernières années ; les chiffres affichés sont ceux de la
@@ -1064,9 +1148,9 @@ explication ; sinon, il apparaît comme nouvelle alerte. Le détail est dans l'o
 
     st.subheader("Réutilisation")
     st.markdown("""
-Les données DGFiP sont publiées sur data.economie.gouv.fr sous Licence Ouverte (Etalab) ; les données Eurostat
-sont réutilisables à condition d'en citer la source. Pour reprendre les chiffres de ce tableau de bord, citer
-« DGFiP et Eurostat, calculs Finances de l'État ».
+Les données DGFiP et DREES sont publiées sur data.economie.gouv.fr et data.drees sous Licence Ouverte (Etalab) ;
+les données Eurostat sont réutilisables à condition d'en citer la source. Pour reprendre les chiffres de ce
+tableau de bord, citer « DGFiP, Eurostat et DREES, calculs Finances de l'État ».
 """)
 
     st.subheader("Contribuer")

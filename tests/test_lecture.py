@@ -2,11 +2,12 @@ import gzip
 import json
 from datetime import date
 
+import duckdb
 import pandas as pd
 import pytest
 
 from finances_etat.controles import IDENTITES, _identites
-from finances_etat.lecture import code_texte, lire_jsonstat, lire_lois, lire_smb, nombre
+from finances_etat.lecture import code_texte, lire_cps, lire_jsonstat, lire_lois, lire_smb, nombre
 from finances_etat.texte import cle_libelle
 
 CODES = {cle_libelle("Solde budgétaire"): "solde_budgetaire",
@@ -83,6 +84,22 @@ def test_lire_jsonstat(tmp_path):
     assert df[("PC_GDP", "2024")] == -5.8
     assert df[("MIO_EUR", "2024")] == -169100.0
     assert ("MIO_EUR", "2023") not in df.index
+
+
+def test_lire_cps_euros_et_cle_de_regime(tmp_path):
+    """Export Parquet DREES : tout est du texte sauf la valeur, en millions d'euros."""
+    chemin = tmp_path / "cps.parquet"
+    duckdb.sql(f"""
+        COPY (SELECT * FROM (VALUES
+            ('2024', '3', 'E11-21.1', 'Pensions de droit direct', 'VIEILLESSE-SURVIE',
+             'Caisse nationale d’assurance vieillesse', '2', 'S13141', 'Régime général', 158987.5)
+        ) t(annee, ps_niveau, ps_code, ps_lib, risque, nom_regime, si_niveau, si_code, si_nom, val))
+        TO '{chemin}' (FORMAT parquet)
+    """)
+    ligne = lire_cps(chemin).iloc[0]
+    assert (ligne["annee"], ligne["niveau_prestation"], ligne["niveau_regime"]) == (2024, 3, 2)
+    assert ligne["montant"] == pytest.approx(158_987.5e6)
+    assert ligne["cle_regime"] == cle_libelle("Caisse nationale d'assurance vieillesse")
 
 
 def test_identite_detecte_un_ecart():
